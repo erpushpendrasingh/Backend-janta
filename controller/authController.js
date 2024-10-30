@@ -49,6 +49,7 @@ exports.registerUser = async (req, res) => {
     vendorDetails,
     associateAdminDetails,
     userDetails,
+    bankName,
    } = req.body;
 
    const existingUser = await User.findOne({ email });
@@ -75,6 +76,7 @@ exports.registerUser = async (req, res) => {
     vendorDetails,
     associateAdminDetails,
     userDetails,
+    bankName,
    });
 
    await newUser.save();
