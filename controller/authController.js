@@ -194,20 +194,20 @@ exports.updateUser = async (req, res) => {
   res.status(500).json({ message: "Server error" });
  }
 };
-
-// Fetch all users or based on query parameters
-// Fetch all users or based on query parameters
 exports.getUsers = async (req, res) => {
  try {
-  const { name, mobileNumber, startDate, endDate } = req.query;
+  const { name, mobileNumber, startDate, endDate, isApproved, isBlocked } =
+   req.query;
   const filters = {};
 
   if (name) {
-   filters.name = { $regex: name, $options: "i" }; // Case-insensitive partial match for name
+   filters.name = { $regex: name, $options: "i" };
   }
+
   if (mobileNumber) {
-   filters.mobileNumber = mobileNumber;
+   filters.mobileNumber = { $regex: mobileNumber, $options: "i" };
   }
+
   if (startDate && endDate) {
    filters.createdAt = {
     $gte: new Date(startDate),
@@ -215,10 +215,60 @@ exports.getUsers = async (req, res) => {
    };
   }
 
+  if (isApproved !== undefined) {
+   filters.isApproved = isApproved === "true";
+  }
+
+  if (isBlocked !== undefined) {
+   filters.isBlocked = isBlocked === "true";
+  }
+
   const users = await User.find(filters);
   res.status(200).json(users);
  } catch (error) {
   console.error(error);
   res.status(500).json({ message: "Failed to fetch users" });
+ }
+};
+exports.changeApprovalStatus = async (req, res) => {
+ try {
+  const { userId, status } = req.body; // `status` should be `true` or `false`
+
+  const user = await User.findByIdAndUpdate(
+   userId,
+   { isApproved: status },
+   { new: true }
+  );
+
+  if (!user) {
+   return res.status(404).json({ message: "User not found" });
+  }
+
+  res
+   .status(200)
+   .json({ message: "Approval status updated successfully", user });
+ } catch (error) {
+  console.error(error);
+  res.status(500).json({ message: "Failed to update approval status" });
+ }
+};
+exports.changeBlockStatus = async (req, res) => {
+ try {
+  const { userId, status } = req.body; // `status` should be `true` or `false`
+
+  const user = await User.findByIdAndUpdate(
+   userId,
+   { isBlocked: status },
+   { new: true }
+  );
+
+  if (!user) {
+   return res.status(404).json({ message: "User not found" });
+  }
+
+  res.status(200).json({ message: "Block status updated successfully", user });
+ } catch (error) {
+  console.error(error);
+  res.status(500).json({ message: "Failed to update block status" });
  }
 };

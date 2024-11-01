@@ -6,6 +6,8 @@ const {
  getBusinessById,
  updateBusinessById,
  deleteBusinessById,
+ updateBusinessDataById,
+ setBusinessToPendingById,
 } = require("../controller/businessController");
 const { getAllCategories } = require("../controller/categoryController");
 const businessRoutes = express.Router();
@@ -20,6 +22,8 @@ businessRoutes.get("/category", getAllCategories);
 businessRoutes.get("/:id", getBusinessById);
 
 // Route to update a business by ID
-businessRoutes.put("/:id", updateBusinessById);
-businessRoutes.delete("/:id", deleteBusinessById);
+businessRoutes.patch("/activate", updateBusinessById);
+businessRoutes.patch("/deactivate", setBusinessToPendingById);
+businessRoutes.patch("/:id", updateBusinessDataById);
+businessRoutes.delete("/", deleteBusinessById);
 module.exports = businessRoutes;

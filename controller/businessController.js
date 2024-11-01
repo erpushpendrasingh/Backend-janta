@@ -25,52 +25,9 @@ const upload = multer({
  }),
 });
 
-// // Controller to create a business
-// const createBusiness = async (req, res) => {
-//  try {
-//   const { businessName, address, contactDetails, category, premiumListing } =
-//    req.body;
-//   const photos = req.files.map((file) => file.location);
-
-//   // Find or create the category
-//   let categoryObject = await Category.findOne({ name: category });
-//   if (!categoryObject) {
-//    categoryObject = new Category({ name: category });
-//    await categoryObject.save();
-//   }
-
-//   // Create new business entry
-//   const newBusiness = new BusinessModel({
-//    businessName,
-//    address: JSON.parse(address),
-//    contactDetails: JSON.parse(contactDetails),
-//    category: categoryObject._id, // Use the ObjectId from the found/created category
-//    premiumListing: premiumListing === "true",
-//    photos,
-//   });
-
-//   await newBusiness.save();
-//   res.status(201).json(newBusiness);
-//  } catch (err) {
-//   console.error(err);
-//   res.status(500).json({ message: "Server Error" });
-//  }
-// };
 const createBusiness = async (req, res) => {
  try {
-  // Log the received body and files for debugging
   console.log("Received body:", req.body);
-  // console.log("Received files:", req.files);
-
-  // // Parse JSON strings from req.body
-  // const address = JSON.parse(req.body.address);
-  // const contactDetails = JSON.parse(req.body.contactDetails);
-  // const businessTimings = JSON.parse(req.body.businessTimings);
-
-  // Collect photo URLs
-  // const photos = req.files.map((file) => file.location);
-
-  // Create new business entry
   const newBusiness = new BusinessModel({
    businessName: req.body.businessName,
    address: req.body.address,
@@ -90,16 +47,6 @@ const createBusiness = async (req, res) => {
  }
 };
 
-// Controller to get all businesses
-// const getAllBusinesses = async (req, res) => {
-//  try {
-//   const businesses = await BusinessModel.find().populate("category", "name");
-//   res.status(200).json(businesses);
-//  } catch (err) {
-//   console.error(err);
-//   res.status(500).json({ message: "Server Error" });
-//  }
-// };
 const getAllBusinesses = async (req, res) => {
  try {
   const {
@@ -109,6 +56,7 @@ const getAllBusinesses = async (req, res) => {
    landmark, // Partial or full landmark
    city, // Partial or full city
    contactPerson, // Partial or full contact person name
+   businessStatus, // Status of the business (Pending, Active, Flagged)
   } = req.query;
 
   const filters = {};
@@ -155,11 +103,15 @@ const getAllBusinesses = async (req, res) => {
    };
   }
 
-  // Fetch businesses based on the filters
-  const businesses = await BusinessModel.find(filters).populate(
-   "category",
-   "name"
-  );
+  // Filter by business status (Pending, Active, Flagged)
+  if (businessStatus) {
+   filters.accountStatus = { $regex: businessStatus, $options: "i" };
+  }
+
+  // Fetch businesses based on the filters and sort by 'createdAt' in descending order
+  const businesses = await BusinessModel.find(filters)
+   .sort({ createdAt: -1 }) // Sort by createdAt field in descending order
+   .populate("category", "name");
 
   res.status(200).json(businesses);
  } catch (err) {
@@ -167,6 +119,74 @@ const getAllBusinesses = async (req, res) => {
   res.status(500).json({ message: "Server Error" });
  }
 };
+
+// const getAllBusinesses = async (req, res) => {
+//  try {
+//   const {
+//    category, // Category ID or Name (for partial matching)
+//    mobileNumber, // Partial or full mobile number
+//    area, // Partial or full area
+//    landmark, // Partial or full landmark
+//    city, // Partial or full city
+//    contactPerson, // Partial or full contact person name
+//   } = req.query;
+
+//   const filters = {};
+
+//   // Filter by category (either by ID or Name)
+//   if (category) {
+//    const categoryObj = await Category.findOne({
+//     name: { $regex: category, $options: "i" },
+//    });
+
+//    if (categoryObj) {
+//     filters.category = categoryObj._id;
+//    }
+//   }
+
+//   // Filter by partial mobile number
+//   if (mobileNumber) {
+//    filters["contactDetails.mobileNumber"] = {
+//     $regex: mobileNumber,
+//     $options: "i",
+//    };
+//   }
+
+//   // Filter by partial area
+//   if (area) {
+//    filters["address.area"] = { $regex: area, $options: "i" };
+//   }
+
+//   // Filter by partial landmark
+//   if (landmark) {
+//    filters["address.landmark"] = { $regex: landmark, $options: "i" };
+//   }
+
+//   // Filter by partial city
+//   if (city) {
+//    filters["address.city"] = { $regex: city, $options: "i" };
+//   }
+
+//   // Filter by partial contact person name
+//   if (contactPerson) {
+//    filters["contactDetails.contactPerson"] = {
+//     $regex: contactPerson,
+//     $options: "i",
+//    };
+//   }
+
+//   // Fetch businesses based on the filters
+//   const businesses = await BusinessModel.find(filters).populate(
+//    "category",
+//    "name"
+//   );
+
+//   res.status(200).json(businesses);
+//  } catch (err) {
+//   console.error(err);
+//   res.status(500).json({ message: "Server Error" });
+//  }
+// };
 
 // Controller to get a business by ID
 const getBusinessById = async (req, res) => {
@@ -188,53 +208,84 @@ const getBusinessById = async (req, res) => {
 
 // Controller to update a business by ID
 const updateBusinessById = async (req, res) => {
+ const { ids } = req.body; // Expecting an array of IDs in the request body
+
  try {
-  const { id } = req.params;
-  const { businessName, address, contactDetails, category, premiumListing } =
-   req.body;
+  // Update the accountStatus of all businesses with the given IDs
+  await BusinessModel.updateMany(
+   { _id: { $in: ids }, accountStatus: "Pending" }, // Only update those that are currently "Pending"
+   { $set: { accountStatus: "Active" } }
+  );
 
-  // Find or create the category
-  let categoryObject = await Category.findOne({ name: category });
-  if (!categoryObject) {
-   categoryObject = new Category({ name: category });
-   await categoryObject.save();
-  }
+  res.status(200).json({ message: "Businesses activated successfully" });
+ } catch (error) {
+  console.error("Error activating businesses:", error);
+  res.status(500).json({ message: "Failed to activate businesses", error });
+ }
+};
+const setBusinessToPendingById = async (req, res) => {
+ const { ids } = req.body; // Expecting an array of IDs in the request body
 
+ try {
+  // Update the accountStatus of all businesses with the given IDs to "Pending"
+  await BusinessModel.updateMany(
+   { _id: { $in: ids }, accountStatus: "Active" }, // Only update those that are currently "Active"
+   { $set: { accountStatus: "Pending" } }
+  );
+
+  res
+   .status(200)
+   .json({ message: "Businesses updated to 'Pending' status successfully" });
+ } catch (error) {
+  console.error("Error updating businesses to 'Pending':", error);
+  res
+   .status(500)
+   .json({ message: "Failed to update businesses to 'Pending'", error });
+ }
+};
+const updateBusinessDataById = async (req, res) => {
+ try {
+  const { id } = req.params; // Get the business ID from the request parameters
+
+  // Find the business by ID and update its fields with the data from req.body
   const updatedBusiness = await BusinessModel.findByIdAndUpdate(
    id,
    {
-    businessName,
-    address: JSON.parse(address),
-    contactDetails: JSON.parse(contactDetails),
-    category: categoryObject._id, // Use the ObjectId from the found/created category
-    premiumListing: premiumListing === "true",
+    $set: {
+     businessName: req.body.businessName,
+     address: req.body.address,
+     contactDetails: req.body.contactDetails,
+     businessTimings: req.body.businessTimings,
+     category: req.body.category,
+     premiumListing: req.body.premiumListing === "true",
+     photos: req.body.photos,
+    },
    },
-   { new: true, runValidators: true }
+   { new: true } // Return the updated document
   );
 
   if (!updatedBusiness) {
    return res.status(404).json({ message: "Business not found" });
   }
+
   res.status(200).json(updatedBusiness);
  } catch (err) {
-  console.error(err);
+  console.error("Error updating business:", err);
   res.status(500).json({ message: "Server Error" });
  }
 };
 
 const deleteBusinessById = async (req, res) => {
+ const { ids } = req.body; // Expecting an array of IDs in the request body
+
  try {
-  const { id } = req.params;
-  const deletedBusiness = await BusinessModel.findByIdAndDelete(id);
+  // Delete the businesses with the given IDs
+  await BusinessModel.deleteMany({ _id: { $in: ids } });
 
-  if (!deletedBusiness) {
-   return res.status(404).json({ message: "Business not found" });
-  }
-
-  res.status(200).json({ message: "Business deleted successfully" });
- } catch (err) {
-  console.error(err);
-  res.status(500).json({ message: "Server Error" });
+  res.status(200).json({ message: "Businesses deleted successfully" });
+ } catch (error) {
+  console.error("Error deleting businesses:", error);
+  res.status(500).json({ message: "Failed to delete businesses", error });
  }
 };
 
@@ -244,5 +295,7 @@ module.exports = {
  getBusinessById,
  updateBusinessById,
  deleteBusinessById,
+ updateBusinessDataById,
+ setBusinessToPendingById,
  upload,
 };
